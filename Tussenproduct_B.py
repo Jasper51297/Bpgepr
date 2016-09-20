@@ -3,8 +3,7 @@ Author: Jasper van Dalum
 Version: 1.1
 """
 
-import subprocess
-import time
+import os
 import sys
 
 def menu():
@@ -19,13 +18,12 @@ def menu():
     return str(m_input)
     
 def download():
-    cmd1 = 'wget ftp://ftp.ensembl.org/pub/release-85/fasta/sarcophilus_harrisii/cds/Sarcophilus_harrisii.DEVIL7.0.cds.all.fa.gz'
-    cmd2 = 'gunzip Sarcophilus_harrisii.DEVIL7.0.cds.all.fa'
-    cmd3 = 'mv Sarcophilus_harrisii.DEVIL7.0.cds.all.fa TasDev.fa'
+    cmd1 = 'wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF_000189315.1_Devil_ref_v7.0/GCF_000189315.1_Devil_ref_v7.0_rna.fna.gz'
+    cmd2 = 'gunzip GCF_000189315.1_Devil_ref_v7.0_rna.fna'
+    cmd3 = 'mv GCF_000189315.1_Devil_ref_v7.0_rna.fna TasDev.fa'
     cmd = [cmd1, cmd2, cmd3]
     for i in cmd:
-        time.sleep(2)
-        subprocess.Popen(i.split(' '), stdout=subprocess.PIPE )
+        os.system(i)
     print('Files zijn gedownload.')
 
 def BLAST():
@@ -33,19 +31,16 @@ def BLAST():
     cmd2 = 'blastall -p blastn -m 8 -d TasDev.fa -i sequenties_groep_04.fa -o out_blast.txt'
     cmd = [cmd1, cmd2]
     for i in cmd:
-        subprocess.Popen(i.split(' '), stdout=subprocess.PIPE )
-        time.sleep(4)
+        os.system(i)
     print('Done. De output staat in out_blast.txt.')
 
 def eValue():
-    subprocess.Popen("""awk '{if ($11=="0.0") print $2}' out_blast.txt >> E0.txt""", shell = True)
+    os.system("""awk '{if ($11=="0.0") print $2}' out_blast.txt >> E0.txt""")
     print('De files met een lage E-Value staan in E0.txt')
-    time.sleep(1)
 
 def getProtein():
-    subprocess.Popen("""cat TasDev.fa | egrep -f E0.txt | sed 's/ /\n/g' | egrep 'gene:' | sed 's/gene://g' > protein.txt""", shell = True)
+    sys.os("""cat TasDev.fa | egrep -f E0.txt | sed 's/ /\n/g' | egrep 'gene:' | sed 's/gene://g' > protein.txt""")
     print('De namen van de eiwitten met een lage E-Value staan in protein.txt')
-    time.sleep(1)
 
 def main():
     while 1 == 1:
