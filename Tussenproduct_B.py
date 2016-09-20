@@ -18,28 +18,31 @@ def menu():
     return str(m_input)
     
 def download():
-    cmd1 = 'wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF_000189315.1_Devil_ref_v7.0/GCF_000189315.1_Devil_ref_v7.0_rna.fna.gz'
-    cmd2 = 'gunzip GCF_000189315.1_Devil_ref_v7.0_rna.fna'
-    cmd3 = 'mv GCF_000189315.1_Devil_ref_v7.0_rna.fna TasDev.fa'
+    #moet tabel van proteins downloadenhttp://www.ncbi.nlm.nih.gov/genomes/Genome2BE/genome2srv.cgi?action=GetFeatures4Grid&amp;download=on&amp;type=Proteins&amp;genome_id=3066&genome_assembly_id=34269&mode=2&is_locus=1&is_locus_tag=0&optcols=1,0,,0,0&amp;filterText=replicon.gi%20=%20-1
+    cmd1 = 'wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF_000189315.1_Devil_ref_v7.0/GCF_000189315.1_Devil_ref_v7.0_protein.faa.gz'
+    cmd2 = 'gunzip GCF_000189315.1_Devil_ref_v7.0_protein.faa'
+    cmd3 = 'mv GCF_000189315.1_Devil_ref_v7.0_protein.faa TasDev.fa'
     cmd = [cmd1, cmd2, cmd3]
     for i in cmd:
         os.system(i)
     print('Files zijn gedownload.')
 
 def BLAST():
-    cmd1 = 'formatdb -i TasDev.fa -p F -o'
-    cmd2 = 'blastall -p blastn -m 8 -d TasDev.fa -i sequenties_groep_04.fa -o out_blast.txt'
+    cmd1 = 'formatdb -i TasDev.fa -p T -o'
+    cmd2 = 'blastall -p blastx -m 8 -d TasDev.fa -i sequenties_groep_04.fa -o out_blast.txt'
     cmd = [cmd1, cmd2]
     for i in cmd:
         os.system(i)
     print('Done. De output staat in out_blast.txt.')
 
-def eValue():
-    os.system("""awk '{if ($11=="0.0") print $2}' out_blast.txt >> E0.txt""")
+def TopHits():
+    os.system('sort -k1,1 -k12,12nr -k11,11n  out_blast.txt | sort -u -k1,1 --merge > E0.txt')
+    os.system("cat E0.txt | tr '\t' '!'| awk -F '!' '{print $2}' > tophits.txt")
     print('De files met een lage E-Value staan in E0.txt')
 
 def getProtein():
-    sys.os("""cat TasDev.fa | egrep -f E0.txt | sed 's/ /\n/g' | egrep 'gene:' | sed 's/gene://g' > protein.txt""")
+    #moet greppen protein code uit protein tabel
+    os.system('cat TasDev.fa | egrep -f tophits.txt > test')
     print('De namen van de eiwitten met een lage E-Value staan in protein.txt')
 
 def main():
@@ -50,13 +53,13 @@ def main():
         if m_input == '2':
             BLAST()
         if m_input == '3':
-            eValue()
+            TopHits()
         if m_input == '4':
             getProtein()
         if m_input == '5':
             download()
             BLAST()
-            eValue()
+            TopHits()
             getProtein()
         if m_input == '6':
             sys.exit()
