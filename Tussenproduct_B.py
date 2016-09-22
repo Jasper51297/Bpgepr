@@ -1,20 +1,20 @@
 """
-Author: Jasper van Dalum
-Version: 1.1
+Author: Jasper van Dalum, Paul de Raadt, Brenda, Duncan, Joery 
+Version: 2.0
 """
 
 import os
 import sys
+from subprocess import call
 
 def menu():
     print('\n\n\n==========OPTIONS==========')
     print('1. Download Files')
     print('2. BLAST')
-    print('3. E-value sort')
-    print('4. Get Proteïns')
-    print('5. Print Results')
-    print('6. Alles')
-    print('7. Exit')
+    print('3. Gather results')
+    print('4. Write results to file')
+    print('5. All')
+    print('6. Exit')
     m_input = input('Input: ')
     return str(m_input)
     
@@ -27,7 +27,7 @@ def download():
     cmd = [cmd1, cmd2, cmd3]
     for i in cmd:
         os.system(i)
-    print('Files zijn gedownload.')
+    print('Download: 1/1')
 
 def BLAST():
     cmd1 = 'formatdb -i TasDev.fa -p T -o'
@@ -35,24 +35,53 @@ def BLAST():
     cmd = [cmd1, cmd2]
     for i in cmd:
         os.system(i)
-    print('Done. De output staat in out_blast.txt.')
+    print('BLAST: 1/1')
 
-def TopHits():
+def getResults():
     os.system('sort -k1,1 -k12,12nr -k11,11n  out_blast.txt | sort -u -k1,1 --merge > E0.txt')
     os.system("cat E0.txt | tr '\t' '!'| awk -F '!' '{print $2}' > tophits.txt")
-    print('De files met een lage E-Value staan in E0.txt')
+    print('Gather results: 1/3')
+    getProtein()
+    print('Gather results: 2/3')
+    getPathways()
+    print('Gather results: 3/3')
 
 def getProtein():
-    #moet greppen protein code uit protein tabel (ProteinTable.txt)
     os.system('cat ProteinTable.txt | egrep -f tophits.txt | awk "{print $1}" > protein.txt')
-    os.system("""cat protein.txt | tr '\t' '!' | awk -F '!' '{print $2 "\t" $6 "\t" $7 "\t" $8 "\t" $10}' > results.txt""")
-    print('De namen van de eiwitten met een lage E-Value staan in protein.txt')
+    os.system("""cat protein.txt | tr '\t' '!' | awk -F '!' '{print $2 "\t" $6 "\t" $7 "\t" $8 "\t" $10}' > ProteinResults.txt""")
 
-def printResults():
-    inFile = open('results.txt')
-    inhoud = inFile.read()
-    print('Replicon Acc \t GeneID \t Locus \t proteïn product \t Protein name ')
-    print(inhoud)
+def getPathways():
+    #os.system('sudo apt install lynx')
+    os.system("cat protein.txt | awk '{print $6}' > linklist.txt")
+    inFile = open('linklist.txt', 'r')
+    inhoud = inFile.readlines()
+    new = ''
+    for regel in inhoud:
+        newregel = ('http://www.kegg.jp/dbget-bin/www_bget?shr:' + regel)
+        new += newregel
+    inFile.close()
+    inFile = open('linklist.txt', 'w')
+    inFile.write(new)
+    inFile.close()
+    inFile = open('linklist.txt', 'r')
+    inhoud = inFile.readlines()
+    for i in inhoud:
+        cmd = i
+        cmd = cmd.replace('\n', '')
+        os.system("lynx %s -dump -nolist | tr -d '\n' | tr ')' '\n' | sed 's/Module/\\n/g' | sed 's/Brite/\\n/g' |egrep Pathway >> PathwayResults.txt"%cmd)
+
+def writeResults():
+    inFile = open('ProteinResults.txt', 'r')
+    ProtRes = inFile.readlines()
+    inFile.close()
+    inFile = open('PathwayResults.txt', 'r')
+    PathRes = inFile.readlines()
+    inFile.close()
+    inFile = open('Results.txt', 'w')
+    for i in range(len(ProtRes)-1):
+        inFile.write(ProtRes[i] + PathRes[i])
+    inFile.close()
+    print('Writing results: 1/1')
 
 def main():
     while 1 == 1:
@@ -62,17 +91,15 @@ def main():
         if m_input == '2':
             BLAST()
         if m_input == '3':
-            TopHits()
+            getResults()
         if m_input == '4':
-            getProtein()
+            writeResults()
         if m_input == '5':
-            printResults()
-        if m_input == '6':
             download()
             BLAST()
-            TopHits()
-            getProtein()
-        if m_input == '7':
+            getResults()
+            writeResults()
+        if m_input == '6':
             sys.exit()
             
 main()
