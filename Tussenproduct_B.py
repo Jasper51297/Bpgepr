@@ -51,7 +51,7 @@ def getProtein():
     os.system("""cat protein.txt | tr '\t' '!' | awk -F '!' '{print $2 "\t" $6 "\t" $7 "\t" $8 "\t" $10}' > ProteinResults.txt""")
 
 def getPathways():
-    #os.system('sudo apt install lynx')
+    os.system("""command -v lynx >/dev/null 2>&1 || { echo >&2 "I require Lynx but it's not installed.  ."; sudo apt install lynx; }""")
     os.system("cat protein.txt | awk '{print $6}' > linklist.txt")
     inFile = open('linklist.txt', 'r')
     inhoud = inFile.readlines()
