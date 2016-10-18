@@ -2,7 +2,7 @@
 Author: Jasper van Dalum, Paul de Raadt, Brenda van den Berg, Duncan, Joery 
 Version: 2.0
 """
-#GeneID | Gennaam | Genstart | Genstop | AccessionCode | EiwitNaam | PathwayName | PathwayDesc | EC
+#GeneID (KEY) | Gennaam | Genstart | Genstop | AccessionCode | EiwitNaam | PathwayName | PathwayDesc | EC | geneSeq | protSeq | exonStart | exonStop
 
 import os
 import sys
@@ -38,7 +38,6 @@ def BLAST():
     print('BLAST: 1/1')
 
 def getResults():
-    #Nog toevoegen: Sequenties, domeinen, exonen
     os.system("sort -k1,1 -k12,12nr -k11,11n  out_blast.txt | sort -u -k1,1 --merge | tr '\t' '!'| awk -F '!' '{print $2}' > tophits.txt")
     results = getProtein()
     for geneid in results.keys():
@@ -46,7 +45,9 @@ def getResults():
         os.system("lynx %s -dump -nolist > kegg"%link)
         pathwayname, pathwaydesc = getPathways()
         EC = getEC()
-        varlist = [pathwayname, pathwaydesc, EC]
+        geneSeq, protSeq = getSeq(lst[3])
+        exonStart, exonStop = getExon(geneid)
+        varlist = [pathwayname, pathwaydesc, EC, geneSeq, protSeq, exonStart, exonStop]
         for var in varlist:
             lst.append(var)
         results[geneid] = lst
@@ -85,6 +86,24 @@ def getEC():
     EC = EC.replace('\n', '')
     EC = EC.replace(' ', '\t')
     return EC
+
+def getSeq(AccCode):
+    geneSeq = os.popen("cat kegg | tr -d '\n' | sed 's/DB search/\\n!/g' | sed 's/NT seq/\\n/g' | egrep ! | tr -d ! | tr -d ' ' | tr -d '\n'").read()
+    protSeq = os.popen("cat TasDev.fa | tr -d '\n' | tr '>' '\n' | egrep %s | sed 's/]/\\n!/g' | egrep ! | tr -d ! | tr -d '\n'"%AccCode).read()
+    return geneSeq, protSeq
+
+def getExon(geneid):
+    exons =  os.popen("cat ref_Devil_ref_v7.0_scaffolds.gff3 | egrep %s | egrep exon | awk '{print $4, $5}'"%geneid).readlines()
+    exonStart, exonStop = '', ''
+    for pos in exons:
+        pos = pos.replace('\n', '\t')
+        poslist = pos.split(' ')
+        exonStart += poslist[0]
+        exonStart += '\t'
+        exonStop += poslist[1]
+    exonStop = exonStop.strip()
+    exonStart = exonStart.strip()
+    return exonStart, exonStop
 
 def main():
     os.system("""command -v lynx >/dev/null 2>&1 || { echo >&2 "I require Lynx but it's not installed.  ."; sudo apt install lynx; }""")
