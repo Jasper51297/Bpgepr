@@ -1,7 +1,7 @@
 #!/usr/bin/python
 """
-Author: Jasper van Dalum, Paul de Raadt, Brenda van den Berg, Duncan, Joery 
-Version: 2.0
+Author: Jasper van Dalum, Paul de Raadt, Brenda van den Berg, Duncan Wierenga, Joery de Vries
+Version: 3.0
 """
 #GeneID (KEY) | Gennaam | Genstart | Genstop | AccessionCode | EiwitNaam | PathwayName | PathwayDesc | EC | geneSeq | protSeq | exonStart | exonStop | chromosome
 
@@ -21,15 +21,14 @@ def menu():
     return str(m_input)
     
 def download():
-    cmd1 = 'wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF_000189315.1_Devil_ref_v7.0/GCF_000189315.1_Devil_ref_v7.0_protein.faa.gz'
-    cmd2 = 'gunzip GCF_000189315.1_Devil_ref_v7.0_protein.faa'
-    cmd3 = 'mv GCF_000189315.1_Devil_ref_v7.0_protein.faa TasDev.fa'
-    #Niet mogelijk om van deze site te downloaden, needs fix.
-    #cmd4 = 'wget http://www.ncbi.nlm.nih.gov/genomes/Genome2BE/genome2srv.cgi?action=GetFeatures4Grid&amp;download=on&amp;type=Proteins&amp;genome_id=3066&genome_assembly_id=34269&mode=2&is_locus=1&is_locus_tag=0&optcols=1,0,,0,0&amp;filterText=replicon.gi%20=%20-1'
-    cmd = [cmd1, cmd2, cmd3]
+    cmd1 = 'wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF_000189315.1_Devil_ref_v7.0/GCF_000189315.1_Devil_ref_v7.0_protein.faa.gz -O TasDev.fa.gz'
+    cmd2 = 'gunzip TasDev.fa'
+    cmd3 = 'wget "http://www.ncbi.nlm.nih.gov/genomes/Genome2BE/genome2srv.cgi?action=GetFeatures4Grid&amp;download=on&amp;type=Proteins&amp;genome_id=3066&genome_assembly_id=34269&mode=2&is_locus=1&is_locus_tag=0&optcols=1,0,,0,0&amp;filterText=replicon.gi%20=%20-1" -O ProteinTable.txt'
+    cmd4 = 'wget "ftp://ftp.ncbi.nlm.nih.gov/genomes/Sarcophilus_harrisii/GFF/ref_Devil_ref_v7.0_scaffolds.gff3.gz"'
+    cmd5 = 'gunzip ref_Devil_ref_v7.0_scaffolds.gff3'
+    cmd = [cmd1, cmd2, cmd3, cmd4, cmd5]
     for i in cmd:
         os.system(i)
-    print 'Download: 1/1'
 
 def BLAST():
     cmd1 = 'formatdb -i TasDev.fa -p T -o'
@@ -37,7 +36,6 @@ def BLAST():
     cmd = [cmd1, cmd2]
     for i in cmd:
         os.system(i)
-    print 'BLAST: 1/1'
 
 def getResults():
     os.system("sort -k1,1 -k12,12nr -k11,11n  out_blast.txt | sort -u -k1,1 --merge | tr '\t' '!'| awk -F '!' '{print $2}' > tophits.txt")
@@ -209,7 +207,6 @@ def insertEiwitPathway(cursor, results):
             
         
 def main():
-    os.system("""command -v lynx >/dev/null 2>&1 || { echo >&2 "I require Lynx but it's not installed.  ."; sudo apt install lynx; }""")
     while 1 == 1:
         m_input = menu()
         if m_input == '1':
@@ -217,8 +214,8 @@ def main():
         if m_input == '2':
             BLAST()
         if m_input == '3':
+            os.system("""command -v lynx >/dev/null 2>&1 || { echo >&2 "I require Lynx but it's not installed.  ."; sudo apt install lynx; }""")
             results = getResults()
-            print results
             outFile = open('Results.txt', 'w')
             results = str(results)
             outFile.write(results)
