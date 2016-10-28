@@ -479,13 +479,10 @@ def makeIntron(exondict):
 
 
 def insertIntron(introndict, cursor):
-    print introndict
     for key in introndict:
         lst = introndict[key]
-        print lst
         for i in lst:
             data = (key, i)
-            print data
             sql = ("""INSERT INTO INTRON_04
                    VALUES (%s, %s);
                    """)
