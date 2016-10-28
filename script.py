@@ -60,9 +60,9 @@ def getResults():
     verzamelen over dit eiwit. De gevonden resultaten worden in een dictionary
     gezet met een geneid als key, en een list met gennaam, genstart,
     genstop, accessioncode, eiwitnaam, pathwaynaam, pathwayomschrijving,
-    EC nummer, gensequentie, proteinsequentie, exonstart, exonstop en
-    chromosoom als values. om een aantal gegevens te kunnen downloaden
-    zullen kegg pagina's voor elk genid worden ingelezen.
+    EC nummer, gensequentie, proteinsequentie, exonstart, exonstop,
+    chromosoom en intronlengte als values. om een aantal gegevens te kunnen
+    downloaden zullen kegg pagina's voor elk genid worden ingelezen.
 
     Returns:
     - results (Dictionary met resultaten)
@@ -77,9 +77,9 @@ def getResults():
         pathwayname, pathwaydesc = getPathways()
         EC = getEC()
         geneSeq, protSeq = getSeq(lst[3])
-        exonStart, exonStop, chrom = getExon(geneid)
+        exonStart, exonStop, chrom, intronLength = getExon(geneid)
         varlist = [pathwayname, pathwaydesc, EC, geneSeq, protSeq, exonStart,
-                   exonStop, chrom]
+                   exonStop, chrom, intronLength]
         for var in varlist:
             lst.append(var)
         results[geneid] = lst
@@ -198,21 +198,23 @@ def getExon(geneid):
     """
     exons = os.popen("cat ref_Devil_ref_v7.0_scaffolds.gff3 | egrep %s | "
                      "egrep exon | awk '{print $4, $5}'" % geneid).readlines()
-    exonStart, exonStop = '', ''
+    exonStart, exonStop, intronLength = '', '', ''
     for pos in exons:
         pos = pos.replace('\n', '\t')
         poslist = pos.split(' ')
         exonStart += poslist[0]
         exonStart += '\t'
         exonStop += poslist[1]
-    exonStop = exonStop.strip()
-    exonStart = exonStart.strip()
+        intronLength += str(int(poslist[1]) - int(poslist[0]))
+        intronLength += '\t'
+    exonStop, exonStart, intronLength = exonStop.strip(),\
+        exonStart.strip(), intronLength.strip()
     NW = os.popen("cat ref_Devil_ref_v7.0_scaffolds.gff3 | egrep %s | tr '\t' "
                   "'\n' | egrep NW_ | uniq | tr -d '\n'" % geneid).read()
     chrom = os.popen("cat ref_Devil_ref_v7.0_scaffolds.gff3 | egrep %s | "
                      "tr ';' '\n' | egrep chromosome= | tr '=' '\n' | "
                      "egrep -v chromosome | tr -d '\n'" % NW).read()
-    return exonStart, exonStop, chrom
+    return exonStart, exonStop, chrom, intronLength
 
 
 def login():
@@ -452,44 +454,31 @@ def insertEiwitPathway(cursor, results):
             a += 1
 
 
-def getExon(cursor):
-    cursor.execute('SELECT * FROM EXON_04 ORDER BY GENID, EXON_START')
-    exonlist, exondict = [], {}
-    for row in cursor:
-        exonlist.append(row)
-    for i in exonlist:
-        exondict[i[0]] = []
-    for i in exonlist:
-        exondict[i[0]].append([i[1], i[2]])
-    return exondict
+def insertIntron(results, cursor):
+    """Deze functie voert een deel van de gegevens uit de dictionary results
+    in voor de tabel INTRON_04.
 
-
-def makeIntron(exondict):
-    introndict, cykablyatdict = {}, {}
-    for key in exondict:
-        introndict[key] = []
-        for i in range(len(exondict[key])-1):
-            introndict[key].append(exondict[key][i+1][0]-exondict[key][i][1])
-    for key in introndict:
-        cykablyatdict[key] = []
-        for i in range(len(introndict[key])):
-            if introndict[key][i] > 0:
-                cykablyatdict[key].append(introndict[key][i])
-    return cykablyatdict
-
-
-def insertIntron(introndict, cursor):
-    for key in introndict:
-        lst = introndict[key]
-        for i in lst:
-            data = (key, i)
+    Parameters:
+    - cursor
+    * Met dit object kunnen queries worden uitgevoerd in de database
+    - results
+    * Dit is een dictionary met resultaten.
+    """
+    for geneid in results.keys():
+        lst, a = results[geneid], 0
+        if '\t' in lst[13]:
+            a, intronLength = 0, lst[13].split('\t')
+        else:
+            a, intronLength = 0, [lst[13]]
+        for i in intronLength:
+            data = (geneid, intronLength[a])
             sql = ("""INSERT INTO INTRON_04
-                   VALUES (%s, %s);
-                   """)
+                   VALUES (%s, %s);""")
             try:
                 cursor.execute(sql, data)
             except:
-                b = 'lalala'
+                b = 'Dubbel'
+            a += 1
 
 
 def main():
@@ -520,15 +509,14 @@ def main():
             insertEC(cursor, results)
             insertPathway(cursor, results)
             insertEiwitPathway(cursor, results)
+            insertIntron(results, cursor)
             with open('isoforms', 'r') as resdict:
                 results = eval(resdict.read())
             insertEiwit(cursor, results)
             insertEC(cursor, results)
             insertPathway(cursor, results)
             insertEiwitPathway(cursor, results)
-            exondict = getExon(cursor)
-            introndict = makeIntron(exondict)
-            insertIntron(introndict, cursor)
+            insertIntron(results, cursor)
             cursor.close()
             conn.close()
         if m_input == '5':
