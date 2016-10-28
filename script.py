@@ -171,9 +171,9 @@ def getSeq(AccCode):
     - protSeq
     * Eiwitsequentie (aminozzuren)
     """
-    geneSeq = os.popen("cat kegg | tr -d '\n' | sed 's/DB search/\\n!/g' | "
-                       "sed 's/NT seq/\\n/g' | egrep ! | tr -d ! | tr -d ' ' "
-                       "| tr -d '\n'").read()
+    geneSeq = os.popen("cat kegg | tr -d '\n' | sed 's/downstream 0__nt/\\n!/g"
+                       "' | sed 's/DBGET/\\n/g' | egrep ! | tr -d ! | tr -d "
+                       "' ' | tr -d '\n'").read()
     protSeq = os.popen("cat TasDev.fa | tr -d '\n' | tr '>' '\n' | egrep %s | "
                        "sed 's/]/\\n!/g' | egrep ! | tr -d ! | tr -d '\n'"
                        % AccCode).read()
@@ -228,7 +228,7 @@ def login():
     connection te sluiten.
     """
     conn_string = ("host='127.0.0.1' dbname='bpgepr04' "
-                   "user='groep04' password='tasmaanseduivel'")
+                   "user='groep4' password='tasmaanseduivel'")
     print "Connecting to database\n	->%s" % (conn_string)
     conn = psycopg2.connect(conn_string)
     print "Connected!\n"
@@ -245,7 +245,7 @@ def deleteTables(cursor):
     * Met dit object kunnen queries worden uitgevoerd in de database
     """
     tablelist = ['EC_04', 'EIWIT_PATHWAY_04', 'PATHWAY_04',
-                 'EXON_04', 'EIWIT_04', 'GEN_04']
+                 'EXON_04', 'INTRON_04', 'EIWIT_04', 'GEN_04']
     for table in tablelist:
         cursor.execute("DROP TABLE IF EXISTS %s" % table)
 
@@ -293,7 +293,13 @@ def createTables(cursor):
                         PathwayID VARCHAR(25) REFERENCES PATHWAY_04(PathwayID),
                         PRIMARY KEY(Accession_code, PathwayID));
                         """)
-    commands = [GEN_04, EXON_04, EIWIT_04, EC_04, PATHWAY_04, EIWIT_PATHWAY_04]
+    INTRON_04 = ("""CREATE TABLE INTRON_04(
+                 GenID VARCHAR(25) NOT NULL REFERENCES GEN_04(GenID),
+                 Intron_lengte INT,
+                 PRIMARY KEY(GenID, Intron_lengte));
+                 """)
+    commands = [GEN_04, EXON_04, INTRON_04, EIWIT_04, EC_04,
+                PATHWAY_04, EIWIT_PATHWAY_04]
     for sql in commands:
         cursor.execute(sql)
 
@@ -446,6 +452,49 @@ def insertEiwitPathway(cursor, results):
             a += 1
 
 
+def getExon(cursor):
+    cursor.execute('SELECT * FROM EXON_04 ORDER BY GENID, EXON_START')
+    exonlist, exondict = [], {}
+    for row in cursor:
+        exonlist.append(row)
+    for i in exonlist:
+        exondict[i[0]] = []
+    for i in exonlist:
+        exondict[i[0]].append([i[1], i[2]])
+    return exondict
+
+
+def makeIntron(exondict):
+    introndict, cykablyatdict = {}, {}
+    for key in exondict:
+        introndict[key] = []
+        for i in range(len(exondict[key])-1):
+            introndict[key].append(exondict[key][i+1][0]-exondict[key][i][1])
+    for key in introndict:
+        cykablyatdict[key] = []
+        for i in range(len(introndict[key])):
+            if introndict[key][i] > 0:
+                cykablyatdict[key].append(introndict[key][i])
+    return cykablyatdict
+
+
+def insertIntron(introndict, cursor):
+    print introndict
+    for key in introndict:
+        lst = introndict[key]
+        print lst
+        for i in lst:
+            data = (key, i)
+            print data
+            sql = ("""INSERT INTO INTRON_04
+                   VALUES (%s, %s);
+                   """)
+            try:
+                cursor.execute(sql, data)
+            except:
+                b = 'lalala'
+
+
 def main():
     while 1 == 1:
         m_input = menu()
@@ -474,6 +523,15 @@ def main():
             insertEC(cursor, results)
             insertPathway(cursor, results)
             insertEiwitPathway(cursor, results)
+            with open('isoforms', 'r') as resdict:
+                results = eval(resdict.read())
+            insertEiwit(cursor, results)
+            insertEC(cursor, results)
+            insertPathway(cursor, results)
+            insertEiwitPathway(cursor, results)
+            exondict = getExon(cursor)
+            introndict = makeIntron(exondict)
+            insertIntron(introndict, cursor)
             cursor.close()
             conn.close()
         if m_input == '5':
