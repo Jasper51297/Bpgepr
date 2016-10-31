@@ -3,8 +3,8 @@
 Scriptname: script.py
 Author: Jasper van Dalum, Paul de Raadt, Brenda van den Berg,
 Duncan Wierenga & Joery de Vries
-Date: 25/10/2016
-Version: 3.2
+Date: 31/10/2016
+Version: 4.0
 """
 import os
 import psycopg2
