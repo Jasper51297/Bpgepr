@@ -230,7 +230,7 @@ def login():
     connection te sluiten.
     """
     conn_string = ("host='127.0.0.1' dbname='bpgepr04' "
-                   "user='groep5' password='tasmaanseduivel'")
+                   "user='groep4' password='tasmaanseduivel'")
     print "Connecting to database\n	->%s" % (conn_string)
     conn = psycopg2.connect(conn_string)
     print "Connected!\n"
