@@ -60,9 +60,9 @@ def getResults():
     verzamelen over dit eiwit. De gevonden resultaten worden in een dictionary
     gezet met een geneid als key, en een list met gennaam, genstart,
     genstop, accessioncode, eiwitnaam, pathwaynaam, pathwayomschrijving,
-    EC nummer, gensequentie, proteinsequentie, exonstart, exonstop,
-    chromosoom en intronlengte als values. om een aantal gegevens te kunnen
-    downloaden zullen kegg pagina's voor elk genid worden ingelezen.
+    EC nummer, gensequentie, proteinsequentie, exonstart, exonstop en
+    chromosoom als values. om een aantal gegevens te kunnen downloaden
+    zullen kegg pagina's voor elk genid worden ingelezen.
 
     Returns:
     - results (Dictionary met resultaten)
@@ -70,19 +70,20 @@ def getResults():
     os.system("sort -k1,1 -k12,12nr -k11,11n  out_blast.txt | sort -u -k1,1 "
               "--merge | tr '\t' '!'| awk -F '!' '{print $2}' > tophits.txt")
     results = getProtein()
-    for geneid in results.keys():
-        lst, link = results[geneid],\
-            ('http://www.kegg.jp/dbget-bin/www_bget?shr:' + str(geneid))
+    for protein in results.keys():
+        lst, link = results[protein],\
+            ('http://www.kegg.jp/dbget-bin/www_bget?shr:' +
+             str(results[protein][3]))
         os.system("lynx %s -dump -nolist > kegg" % link)
         pathwayname, pathwaydesc = getPathways()
         EC = getEC()
-        geneSeq, protSeq = getSeq(lst[3])
-        exonStart, exonStop, chrom, intronLength = getExon(geneid)
-        varlist = [pathwayname, pathwaydesc, EC, geneSeq, protSeq, exonStart,
-                   exonStop, chrom, intronLength]
+        geneSeq, protSeq = getSeq(protein)
+        exonStart, exonStop, chrom = getExon(lst[3])
+        varlist = [pathwayname, pathwaydesc, EC, geneSeq, protSeq,
+                   exonStart, exonStop, chrom]
         for var in varlist:
             lst.append(var)
-        results[geneid] = lst
+        results[protein] = lst
     return results
 
 
@@ -101,7 +102,7 @@ def getProtein():
     os.system('cat ProteinTable.txt | egrep -f tophits.txt |'
               'awk "{print $1}" > protein.txt')
     proteins = os.popen("""cat protein.txt | tr '\t' '!' | awk -F '!' '
-                        {print $6 "\t" $7 "\t" $3 "\t" $4 "\t" $8 "\t" $10}'
+                        {print $8 "\t" $7 "\t" $3 "\t" $4 "\t" $6 "\t" $10}'
                         """).readlines()
     for line in proteins:
         line = line.replace('\r', '')
@@ -197,24 +198,23 @@ def getExon(geneid):
     * string met chromosoom waar het gen op ligt
     """
     exons = os.popen("cat ref_Devil_ref_v7.0_scaffolds.gff3 | egrep %s | "
-                     "egrep exon | awk '{print $4, $5}'" % geneid).readlines()
-    exonStart, exonStop, intronLength = '', '', ''
+                     "egrep CDS | awk '{print $4, $5}'" % geneid).readlines()
+    exonStart, exonStop = '', ''
     for pos in exons:
         pos = pos.replace('\n', '\t')
         poslist = pos.split(' ')
-        exonStart += poslist[0]
-        exonStart += '\t'
-        exonStop += poslist[1]
-        intronLength += str(int(poslist[1]) - int(poslist[0]))
-        intronLength += '\t'
-    exonStop, exonStart, intronLength = exonStop.strip(),\
-        exonStart.strip(), intronLength.strip()
+        if poslist[0] not in exonStart and poslist[1] not in exonStop:
+            exonStart += poslist[0]
+            exonStart += '\t'
+            exonStop += poslist[1]
+    exonStop = exonStop.strip()
+    exonStart = exonStart.strip()
     NW = os.popen("cat ref_Devil_ref_v7.0_scaffolds.gff3 | egrep %s | tr '\t' "
                   "'\n' | egrep NW_ | uniq | tr -d '\n'" % geneid).read()
     chrom = os.popen("cat ref_Devil_ref_v7.0_scaffolds.gff3 | egrep %s | "
                      "tr ';' '\n' | egrep chromosome= | tr '=' '\n' | "
                      "egrep -v chromosome | tr -d '\n'" % NW).read()
-    return exonStart, exonStop, chrom, intronLength
+    return exonStart, exonStop, chrom
 
 
 def login():
@@ -229,8 +229,8 @@ def login():
     * Dit is het connection object, deze zal gebruikt worden om de
     connection te sluiten.
     """
-    conn_string = ("host='127.0.0.1' dbname='bpgepr04' "
-                   "user='groep4' password='tasmaanseduivel'")
+    conn_string = ("host='127.0.0.1' dbname='bpgepr' "
+                   "user='jassepoester' password='C3467Zaa'")
     print "Connecting to database\n	->%s" % (conn_string)
     conn = psycopg2.connect(conn_string)
     print "Connected!\n"
@@ -247,7 +247,7 @@ def deleteTables(cursor):
     * Met dit object kunnen queries worden uitgevoerd in de database
     """
     tablelist = ['EC_04', 'EIWIT_PATHWAY_04', 'PATHWAY_04',
-                 'EXON_04', 'INTRON_04', 'EIWIT_04', 'GEN_04']
+                 'EXON_04', 'EIWIT_04', 'GEN_04']
     for table in tablelist:
         cursor.execute("DROP TABLE IF EXISTS %s" % table)
 
@@ -261,7 +261,7 @@ def createTables(cursor):
     * Met dit object kunnen queries worden uitgevoerd in de database
     """
     GEN_04 = ("""CREATE TABLE GEN_04 (
-              GenID VARCHAR(25) NOT NULL UNIQUE PRIMARY KEY,
+              GenID INT NOT NULL UNIQUE PRIMARY KEY,
               Naam VARCHAR(25),
               Chromosoom VARCHAR(2),
               Start_gen INT,
@@ -269,14 +269,15 @@ def createTables(cursor):
               Sequentie TEXT);
               """)
     EXON_04 = ("""CREATE TABLE EXON_04 (
-               GenID VARCHAR(25) NOT NULL REFERENCES GEN_04(GenID),
-               Exon_start INT NOT NULL,
+               GenID INT NOT NULL REFERENCES GEN_04(GenID),
+               ExonID INT NOT NULL,
+               Exon_start INT NOT NULL UNIQUE,
                Exon_stop INT NOT NULL,
-               PRIMARY KEY(GenID, Exon_start));
+               PRIMARY KEY(GenID, ExonID));
                """)
     EIWIT_04 = ("""CREATE TABLE EIWIT_04 (
                 Accession_code VARCHAR(25) UNIQUE PRIMARY KEY,
-                GenID VARCHAR(25) REFERENCES GEN_04(GenID),
+                GenID INT REFERENCES GEN_04(GenID),
                 Naam TEXT,
                 Sequentie TEXT);
                 """)
@@ -295,12 +296,7 @@ def createTables(cursor):
                         PathwayID VARCHAR(25) REFERENCES PATHWAY_04(PathwayID),
                         PRIMARY KEY(Accession_code, PathwayID));
                         """)
-    INTRON_04 = ("""CREATE TABLE INTRON_04(
-                 GenID VARCHAR(25) NOT NULL REFERENCES GEN_04(GenID),
-                 Intron_lengte INT,
-                 PRIMARY KEY(GenID, Intron_lengte));
-                 """)
-    commands = [GEN_04, EXON_04, INTRON_04, EIWIT_04, EC_04,
+    commands = [GEN_04, EXON_04, EIWIT_04, EC_04,
                 PATHWAY_04, EIWIT_PATHWAY_04]
     for sql in commands:
         cursor.execute(sql)
@@ -316,13 +312,16 @@ def insertGen(cursor, results):
     - results
     * Dit is een dictionary met resultaten.
     """
-    for geneid in results.keys():
-        lst = results[geneid]
-        data = (geneid, lst[0], lst[12], lst[1], lst[2], lst[8])
+    for protein in results.keys():
+        lst = results[protein]
+        data = (lst[3], lst[0], lst[12], lst[1], lst[2], lst[8])
         sql = ("""INSERT INTO GEN_04
                VALUES (%s, %s, %s, %s, %s, %s);
                """)
-        cursor.execute(sql, data)
+        try:
+            cursor.execute(sql, data)
+        except:
+            b = 'Isoform'
 
 
 def insertExon(cursor, results):
@@ -335,23 +334,23 @@ def insertExon(cursor, results):
     - results
     * Dit is een dictionary met resultaten.
     """
-    for geneid in results.keys():
-        lst = results[geneid]
-        exon_start, exon_stop, a = lst[10], lst[11], 0
-        if '\t' in exon_start:
-            exon_start, exon_stop = exon_start.split('\t'), \
-                exon_stop.split('\t')
-        else:
-            exon_start, exon_stop = [lst[10]], [lst[11]]
+    exonid = 1
+    for protein in results.keys():
+        exon_start, exon_stop, a, lst = results[protein][10], \
+                                    results[protein][11], 0, results[protein]
+        exon_start, exon_stop = exon_start.split('\t'), \
+            exon_stop.split('\t')
         for i in exon_start:
-            data = (geneid, exon_start[a], exon_stop[a])
-            sql = ("""INSERT INTO EXON_04
-                   VALUES (%s, %s, %s);
-                   """)
+            data, sql = (lst[3], exonid, exon_start[a],
+                         exon_stop[a]), \
+                        ('''INSERT INTO EXON_04
+                         VALUES (%s, %s, %s, %s);
+                         ''')
             try:
                 cursor.execute(sql, data)
+                exonid += 1
             except:
-                b = 1
+                b = 'Dubbel'
             a += 1
 
 
@@ -365,9 +364,9 @@ def insertEiwit(cursor, results):
     - results
     * Dit is een dictionary met resultaten.
     """
-    for geneid in results.keys():
-        lst = results[geneid]
-        data = (lst[3], geneid, lst[4], lst[9])
+    for protein in results.keys():
+        lst = results[protein]
+        data = (protein, lst[3], lst[4], lst[9])
         sql = ("""INSERT INTO EIWIT_04 VALUES
                (%s, %s, %s, %s);
                """)
@@ -384,14 +383,11 @@ def insertEC(cursor, results):
     - results
     * Dit is een dictionary met resultaten.
     """
-    for geneid in results.keys():
-        lst, a = results[geneid], 0
-        if '\t' in lst[7]:
-            EC = lst[7].split('\t')
-        else:
-            EC = [lst[7]]
+    for protein in results.keys():
+        lst, a = results[protein], 0
+        EC = lst[7].split('\t')
         for i in EC:
-            data = (lst[3], EC[a])
+            data = (protein, EC[a])
             sql = ("""INSERT INTO EC_04 VALUES
                    (%s, %s);
                    """)
@@ -412,12 +408,9 @@ def insertPathway(cursor, results):
     - results
     * Dit is een dictionary met resultaten.
     """
-    for geneid in results.keys():
-        lst, a = results[geneid], 0
-        if '\t' in lst[5]:
-            pathwayname, pathwaydesc = lst[5].split('\t'), lst[6].split('\t')
-        else:
-            pathwayname, pathwaydesc = [lst[5]], [lst[6]]
+    for protein in results.keys():
+        lst, a = results[protein], 0
+        pathwayname, pathwaydesc = lst[5].split('\t'), lst[6].split('\t')
         for i in pathwayname:
             data = (pathwayname[a], pathwaydesc[a])
             sql = ("""INSERT INTO PATHWAY_04
@@ -440,44 +433,14 @@ def insertEiwitPathway(cursor, results):
     - results
     * Dit is een dictionary met resultaten.
     """
-    for geneid in results.keys():
-        lst, a = results[geneid], 0
-        if '\t' in lst[5]:
-            a, pathwayname = 0, lst[5].split('\t')
-        else:
-            a, pathwayname = 0, [lst[5]]
+    for protein in results.keys():
+        lst, a = results[protein], 0
+        a, pathwayname = 0, lst[5].split('\t')
         for i in pathwayname:
-            data = (lst[3], pathwayname[a])
+            data = (protein, pathwayname[a])
             sql = ("""INSERT INTO EIWIT_PATHWAY_04
                    VALUES (%s, %s);""")
             cursor.execute(sql, data)
-            a += 1
-
-
-def insertIntron(results, cursor):
-    """Deze functie voert een deel van de gegevens uit de dictionary results
-    in voor de tabel INTRON_04.
-
-    Parameters:
-    - cursor
-    * Met dit object kunnen queries worden uitgevoerd in de database
-    - results
-    * Dit is een dictionary met resultaten.
-    """
-    for geneid in results.keys():
-        lst, a = results[geneid], 0
-        if '\t' in lst[13]:
-            a, intronLength = 0, lst[13].split('\t')
-        else:
-            a, intronLength = 0, [lst[13]]
-        for i in intronLength:
-            data = (geneid, intronLength[a])
-            sql = ("""INSERT INTO INTRON_04
-                   VALUES (%s, %s);""")
-            try:
-                cursor.execute(sql, data)
-            except:
-                b = 'Dubbel'
             a += 1
 
 
@@ -509,14 +472,6 @@ def main():
             insertEC(cursor, results)
             insertPathway(cursor, results)
             insertEiwitPathway(cursor, results)
-            insertIntron(results, cursor)
-            with open('isoforms', 'r') as resdict:
-                results = eval(resdict.read())
-            insertEiwit(cursor, results)
-            insertEC(cursor, results)
-            insertPathway(cursor, results)
-            insertEiwitPathway(cursor, results)
-            insertIntron(results, cursor)
             cursor.close()
             conn.close()
         if m_input == '5':
