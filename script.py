@@ -1,4 +1,5 @@
 #!/usr/bin/python
+
 """
 Scriptname: script.py
 Author: Jasper van Dalum, Paul de Raadt, Brenda van den Berg,
@@ -6,6 +7,7 @@ Duncan Wierenga & Joery de Vries
 Date: 31/10/2016
 Version: 4.0
 """
+
 import os
 import psycopg2
 import sys
@@ -28,7 +30,7 @@ def menu():
 
 
 def download():
-    """Deze functie download files om de gegevens uit te halen.
+    """Deze functie download files om de resultaten uit te halen.
     De file wordt geunzipt als de file een zip bestand is.
     """
     os.system('wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF_000189315.1_Dev'
@@ -55,14 +57,14 @@ def BLAST():
 
 
 def getResults():
-    """Deze functie selecteerd de unieke eiwitten uit out_blast.txt.
+    """Deze functie selecteert de unieke eiwitten uit out_blast.txt.
     Voor elk van deze eiwitten worden functies opgeroepen die resultaten
     verzamelen over dit eiwit. De gevonden resultaten worden in een dictionary
-    gezet met een geneid als key, en een list met gennaam, genstart,
-    genstop, accessioncode, eiwitnaam, pathwaynaam, pathwayomschrijving,
+    gezet met een accessioncode als key en een list met gennaam, genstart,
+    genstop, genid, eiwitnaam, pathwaynaam, pathwayomschrijving,
     EC nummer, gensequentie, proteinsequentie, exonstart, exonstop en
     chromosoom als values. om een aantal gegevens te kunnen downloaden
-    zullen kegg pagina's voor elk genid worden ingelezen.
+    zullen kegg pagina's voor elk eiwit worden ingelezen.
 
     Returns:
     - results (Dictionary met resultaten)
@@ -90,8 +92,8 @@ def getResults():
 def getProtein():
     """Deze functie zoekt gegevens uit de file ProteinTable.txt
     bij de eiwitten in de file tophits.txt. Alle resultaten
-    worden in een dictionary gestopt. De key is geneid en de
-    values zijn: gennaam, genstart, genstop, accessioncode en
+    worden in een dictionary gestopt. De key is de accessioncode en de
+    values zijn: gennaam, genstart, genstop, genid en
     eiwitnaam.
 
     Returns:
@@ -170,7 +172,7 @@ def getSeq(AccCode):
     - geneSeq
     * Gensequentie (aminozuren)
     - protSeq
-    * Eiwitsequentie (aminozzuren)
+    * Eiwitsequentie (nucleotides)
     """
     geneSeq = os.popen("cat kegg | tr -d '\n' | sed 's/downstream 0__nt/\\n!/g"
                        "' | sed 's/DBGET/\\n/g' | egrep ! | tr -d ! | tr -d "
@@ -182,7 +184,7 @@ def getSeq(AccCode):
 
 
 def getExon(geneid):
-    """Deze functie haalt start en eindposities van het
+    """Deze functie haalt start en stopdposities van het
     gen op en het chromosoom waar het gen ligt.
 
     Parameters:
@@ -231,7 +233,7 @@ def login():
     """
     conn_string = ("host='127.0.0.1' dbname='bpgepr04' "
                    "user='groep4' password='tasmaanseduivel'")
-    print "Connecting to database\n	->%s" % (conn_string)
+    print "Connecting to database\n    ->%s" % (conn_string)
     conn = psycopg2.connect(conn_string)
     print "Connected!\n"
     conn.autocommit = True
